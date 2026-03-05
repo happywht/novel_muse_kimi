@@ -34,10 +34,14 @@ function App() {
     isSaving
   } = useProjectStore();
 
+  // 调试日志
+  console.log('[App] Render - isLoading:', isLoading);
+
   const [showVersionPanel, setShowVersionPanel] = useState(false);
 
   // 初始化
   useEffect(() => {
+    console.log('[App] Calling initialize');
     initialize();
   }, []);
 

@@ -96,6 +96,8 @@ export interface ProjectStore {
   project: ProjectState;
   savedProjects: ProjectState[];
   storageVersion: string;
+  isLoading: boolean;
+  isSaving: boolean;
   
   // --- 基础 Actions ---
   updateProject: (data: Partial<ProjectState>, options?: { skipPersist?: boolean }) => void;
@@ -172,6 +174,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   project: INITIAL_PROJECT,
   savedProjects: [],
   storageVersion: STORAGE_VERSION,
+  isLoading: true, // 初始状态为加载中
+  isSaving: false,
 
   // --- 基础 Actions ---
   updateProject: (data, options = {}) => {
@@ -197,7 +201,25 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   // --- 项目生命周期 ---
   initialize: async () => {
-    await get().loadFromPersistentStorage();
+    console.log('[Init] Starting initialization...');
+    set({ isLoading: true });
+    try {
+      await get().loadFromPersistentStorage();
+      console.log('[Init] Load completed successfully');
+    } catch (error) {
+      console.error('[Init] Failed to initialize:', error);
+      // 创建默认项目作为 fallback
+      const fallbackProj = { 
+        ...INITIAL_PROJECT, 
+        id: crypto.randomUUID(), 
+        title: '恢复项目',
+        volumes: [] 
+      };
+      set({ project: fallbackProj, savedProjects: [fallbackProj] });
+    } finally {
+      console.log('[Init] Setting isLoading to false');
+      set({ isLoading: false });
+    }
   },
 
   createProject: async () => {
@@ -301,37 +323,48 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   loadFromPersistentStorage: async () => {
+    console.log('[Load] Loading from localStorage...');
     const stored = localStorage.getItem(STORAGE_KEY);
+    console.log('[Load] Stored data:', stored ? 'found' : 'not found');
+    
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
+        console.log('[Load] Parsed data:', Array.isArray(parsed) ? `array[${parsed.length}]` : typeof parsed);
+        
         if (Array.isArray(parsed) && parsed.length > 0) {
           // 数据迁移：确保所有必要字段存在
-          const migrated = parsed.map(p => ({
-            ...INITIAL_PROJECT,
-            ...p,
-            volumes: p.volumes || [],
-            plotArcs: p.plotArcs || [],
-            echoes: p.echoes || [],
-            timeline: p.timeline || [],
-            qualityReports: p.qualityReports || [],
-            goals: p.goals || { dailyWordCount: 2000, totalWordTarget: 100000 },
-            versionControl: p.versionControl || INITIAL_PROJECT.versionControl,
-          }));
+          const migrated = parsed.map((p, index) => {
+            console.log(`[Load] Migrating project ${index}:`, p.id || 'no-id');
+            return {
+              ...INITIAL_PROJECT,
+              ...p,
+              volumes: p.volumes || [],
+              plotArcs: p.plotArcs || [],
+              echoes: p.echoes || [],
+              timeline: p.timeline || [],
+              qualityReports: p.qualityReports || [],
+              goals: p.goals || { dailyWordCount: 2000, totalWordTarget: 100000 },
+              versionControl: p.versionControl || INITIAL_PROJECT.versionControl,
+            };
+          });
           
           const mostRecent = migrated.sort((a, b) => b.lastModified - a.lastModified)[0];
+          console.log('[Load] Most recent project:', mostRecent.id);
           set({
             savedProjects: migrated,
             project: mostRecent,
           });
+          console.log('[Load] State updated with migrated data');
           return;
         }
       } catch (e) {
-        console.error('Failed to load projects', e);
+        console.error('[Load] Failed to parse stored data:', e);
       }
     }
     
     // 首次使用，创建默认项目
+    console.log('[Load] Creating default project...');
     const newProj = { 
       ...INITIAL_PROJECT, 
       id: crypto.randomUUID(), 
@@ -339,7 +372,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       volumes: [] 
     };
     set({ project: newProj, savedProjects: [newProj] });
+    console.log('[Load] Default project created:', newProj.id);
     await get().saveToPersistentStorage(true);
+    console.log('[Load] Default project saved');
   },
 
   exportProject: (id) => {
