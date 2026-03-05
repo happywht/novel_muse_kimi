@@ -201,7 +201,12 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project }) => {
         expectedPOV: currentChapter.expectedPOV,
       };
 
-      const stream = aiRouter.continueWriting(finalContext, options);
+      const stream = aiRouter.continueWriting(
+        finalContext,
+        project.characters,
+        project.worldSettings,
+        options
+      );
 
       for await (const response of stream) {
         if (abortControllerRef.current?.signal.aborted) break;
@@ -259,7 +264,13 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project }) => {
         creativity: project.creativeSettings.creativity,
       };
 
-      const stream = aiRouter.polish(text, instruction, options);
+      const stream = aiRouter.polish(
+        text,
+        instruction,
+        project.characters,
+        project.worldSettings,
+        options
+      );
 
       for await (const response of stream) {
         if (abortControllerRef.current?.signal.aborted) break;

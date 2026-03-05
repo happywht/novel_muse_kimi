@@ -217,6 +217,9 @@ export interface CreativeSettings {
     autoSuggest: boolean;
     triggerDelay: number;  // 秒
   };
+  
+  // Prompt 配置（兼容 geminiService）
+  promptProfile?: string;
 }
 
 // ============================================
